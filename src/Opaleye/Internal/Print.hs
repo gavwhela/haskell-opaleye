@@ -158,3 +158,9 @@ ppUpdateReturning (Sql.Returning update returnExprs) =
   HPrint.ppUpdate update
   $$ text "RETURNING"
   <+> HPrint.commaV HPrint.ppSqlExpr (NEL.toList returnExprs)
+
+ppDeleteReturning :: Sql.Returning HSql.SqlDelete -> Doc
+ppDeleteReturning (Sql.Returning delete returnExprs) =
+  HPrint.ppDelete delete
+  $$ text "RETURNING"
+  <+> HPrint.commaV HPrint.ppSqlExpr (NEL.toList returnExprs)

@@ -31,7 +31,7 @@ library
     , contravariant       >= 1.2     && < 1.5
     , direct-sqlite       >= 2.3.13  && < 2.4
     , pretty              >= 1.1.1.0 && < 1.2
-    , product-profunctors >= 0.6.2   && < 0.8
+    , product-profunctors >= 0.6.2   && < 0.9
     , profunctors         >= 4.0     && < 5.3
     , semigroups          >= 0.13    && < 0.19
     , sqlite-simple

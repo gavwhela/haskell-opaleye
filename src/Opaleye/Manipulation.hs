@@ -126,7 +126,7 @@ runUpdateReturning :: (D.Default RQ.QueryRunner columnsReturned haskells)
                    -- @f@ returns @TRUE@ and leave unchanged rows for
                    -- which @f@ returns @FALSE@.
                    -> (columnsR -> columnsReturned)
-                   -- ^ Functon @g@ to apply to the updated rows
+                   -- ^ Function @g@ to apply to the updated rows
                    -> IO [haskells]
                    -- ^ Returned rows after @g@ has been applied
 runUpdateReturning = runUpdateReturningExplicit D.def
@@ -143,6 +143,22 @@ runDelete :: PGS.Connection
           -> IO Int64
           -- ^ The number of rows deleted
 runDelete conn = PGS.execute_ conn . fromString .: arrangeDeleteSql
+
+runDeleteReturning :: (D.Default RQ.QueryRunner columnsReturned haskells)
+                   => PGS.Connection
+                   -- ^
+                   -> T.Table a columnsR
+                   -- ^ Table to delete rows from
+                   -> (columnsR -> Column PGBool)
+                   -- ^ Predicate function @f@ to choose which rows to
+                   -- delete. 'runDeleteReturning' will delete rows
+                   -- for which @f@ returuns @TRUE@ and leave
+                   -- unchanged rows for which @f@ returns @fALSE@.
+                   -> (columnsR -> columnsReturned)
+                   -- ^ Function @g@ to apply to the deleted rows
+                   -> IO [haskells]
+                   -- ^ Returned rows after @g@ has been applied
+runDeleteReturning = runDeleteReturningExplicit D.def
 
 -- * Explicit versions
 
@@ -195,6 +211,23 @@ runUpdateReturningExplicit :: RQ.QueryRunner columnsReturned haskells
 runUpdateReturningExplicit qr conn t update cond r =
   PGS.queryWith_ parser conn
                  (fromString (arrangeUpdateReturningSql u t update cond r))
+  where IRQ.QueryRunner u _ _ = qr
+        parser = IRQ.prepareRowParser qr (r v)
+        TI.View v = TI.tableColumnsView (TI.tableColumns t)
+
+-- | You probably don't need this, but can just use
+-- 'runDeleteReturning' instead.  You only need it if you want to run
+-- an DELETE RETURNING statement but need to be explicit about the
+-- 'QueryRunner'.
+runDeleteReturningExplicit :: RQ.QueryRunner columnsReturned haskells
+                           -> PGS.Connection
+                           -> T.Table a columnsR
+                           -> (columnsR -> Column PGBool)
+                           -> (columnsR -> columnsReturned)
+                           -> IO [haskells]
+runDeleteReturningExplicit qr conn t cond r =
+  PGS.queryWith_ parser conn
+                 (fromString (arrangeDeleteReturningSql u t cond r))
   where IRQ.QueryRunner u _ _ = qr
         parser = IRQ.prepareRowParser qr (r v)
         TI.View v = TI.tableColumnsView (TI.tableColumns t)
@@ -344,3 +377,29 @@ arrangeUpdateReturningSql :: U.Unpackspec columnsReturned ignored
                           -> String
 arrangeUpdateReturningSql =
   show . Print.ppUpdateReturning .::. arrangeUpdateReturning
+
+{-# DEPRECATED arrangeDeleteReturning
+    "You probably want 'runDeleteReturning' instead. \
+    \Will be removed in version 0.7." #-}
+arrangeDeleteReturning :: U.Unpackspec columnsReturned ignored
+                       -> T.Table a columnsR
+                       -> (columnsR -> Column PGBool)
+                       -> (columnsR -> columnsReturned)
+                       -> Sql.Returning HSql.SqlDelete
+arrangeDeleteReturning unpackspec table cond returningf =
+  Sql.Returning delete returningSEs
+  where delete = arrangeDelete table cond
+        TI.View columnsR = TI.tableColumnsView (TI.tableColumns table)
+        returningPEs = U.collectPEs unpackspec (returningf columnsR)
+        returningSEs = Sql.ensureColumnsGen id (map Sql.sqlExpr returningPEs)
+
+{-# DEPRECATED arrangeDeleteReturningSql
+    "You probably want 'runDeleteReturning' instead. \
+    \Will be removed in version 0.7." #-}
+arrangeDeleteReturningSql :: U.Unpackspec columnsReturned ignored
+                          -> T.Table a columnsR
+                          -> (columnsR -> Column PGBool)
+                          -> (columnsR -> columnsReturned)
+                          -> String
+arrangeDeleteReturningSql =
+  show . Print.ppDeleteReturning .:: arrangeDeleteReturning
